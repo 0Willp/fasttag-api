@@ -3,10 +3,11 @@ import hashlib
 import random
 import requests
 from urllib.parse import urlencode
+from typing import Dict
+from models import TagData, ApiResponse
 
-from deploy import response
 
-API_URL = 'https://server.findtaq.top/fit/openapi/devicedata/v1'
+API_URL = 'https://server.findtag.top/fit/openapi/devicedata/v1'
 
 class FindtagApiClient:
     def __init__(self, api_key: str, api_secret: str):
@@ -22,11 +23,11 @@ class FindtagApiClient:
         md5_hash = hashlib.md5(string_to_sign.encode('utf-8')).hexdigest()
         return md5_hash.upper()
 
-    def get_device_data(self, public_key: str, time_period: str = '0') -> TagData:
+    def get_device_data(self, public_key: str, time_period: str = '0') -> 'TagData':
         timestamp = str(int(time.time()))
         nonce = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
 
-        request_params = {
+        request_params: Dict[str, str] = {
             'timestamp': timestamp,
             'nonce': nonce,
             'publickey': public_key,
