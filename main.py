@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException
-from client import FindtagApiClient  # Importação do módulo client
-from models import TagPositionResponse  # Importação do modelo de resposta
+from client import FindtagClientMT01, FindtagClientMT02
+from models import TagPositionResponse
 import os
 from typing import Dict, Any
 
@@ -12,6 +12,8 @@ app = FastAPI(
 
 API_KEY = "123"
 API_SECRET = "fitApp2025-855550-77536756780035706067"
+
+API_TOKEN = "16WRTZrmqRTxkB2yFRjLSMxPlQeW4VI1"
 
 """
 TAG_CREDS: Dict[str, Dict[str, str]] = {
@@ -41,18 +43,29 @@ def get_tag_client(tag_type: str) -> FindtagApiClient:
         raise HTTPException(status_code=500, detail=f"Error initializing Findtag API client: {str(e)}")
 """
 
+
+findtag_client_mt01: FindtagClientMT01 | None = None
+try:
+    findtag_client = FindtagClientMT01(API_KEY.strip(), api_secret=API_SECRET.strip())
+except ValueError as e:
+    print(f"Error initializing Findtag API client: {str(e)}")
+
+
+
+findtag_client_mt02: FindtagClientMT02 | None = None
+try:
+    findtag_client_mt02 = FindtagClientMT02(API_TOKEN.strip())
+except ValueError as e:
+    print(f"Error initializing Findtag API MT02 client: {str(e)}")
+
+
 def google_maps_link(lat: float, lon: float) -> str:
     return f"http://maps.google.com/?q={lat},{lon}"
 
 
-findtag_client: FindtagApiClient | None = None
-try:
-    findtag_client = FindtagApiClient(API_KEY.strip(), api_secret=API_SECRET.strip())
-except ValueError as e:
-    print(f"Error initializing Findtag API client: {str(e)}")
 
 @app.get("/tag/position/{public_key}", response_model=TagPositionResponse, summary="Get Tag Position and Google Maps Link")
-async def get_tag_position(public_key: str):
+async def get_tag_position_mt01(public_key: str):
     if not findtag_client:
         raise HTTPException(status_code=500, detail="Findtag API client is not initialized.")
     try:
@@ -61,3 +74,14 @@ async def get_tag_position(public_key: str):
         return TagPositionResponse(**tag_data.model_dump(), google_maps_url=google_maps_url)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/tag/position/mt02/{public_key}", response_model=TagPositionResponse, summary="Get Tag Position and Google Maps Link for MT02")
+async def get_tag_position_mt02(public_key: str):
+    if not findtag_client_mt02:
+        raise HTTPException(status_code=503, detail="Findtag API MT02 client is not initialized.")
+
+    try:
+        data = findtag_client_mt02.get_device_data(public_key)
+        return TagPositionResponse(**data.model_dump(),google_maps_link=google_maps_link(data.latitude, data.longitude))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

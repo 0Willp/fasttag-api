@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 class TagData(BaseModel):
-    batteryLevel: Optional[float]  # nivel de bateria
+    batteryLevel: Optional[int] = None  # nivel de bateria
     collectionTime: int # tempo de coleta dos dados em formato unix timestamp
     coordinate: str # coordenadas geográficas
     latitude: float # latitude extraida da coordenada
@@ -18,7 +18,7 @@ class ApiResponse(BaseModel):
     data: list[TagData]  # array de objetos TagData
 
 class TagPositionResponse(TagData):
-    google_maps_url: str
+    google_maps_link: str
 
 
 
