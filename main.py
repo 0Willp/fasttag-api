@@ -11,9 +11,9 @@ app = FastAPI(
 )
 
 API_KEY = "123"
-API_SECRET = "fitApp2025-855550-77536756780035706067"
+API_SECRET = "" # secret para MT01
 
-API_TOKEN = "16WRTZrmqRTxkB2yFRjLSMxPlQeW4VI1"
+API_TOKEN = ""   # token para MT02
 
 """
 TAG_CREDS: Dict[str, Dict[str, str]] = {
