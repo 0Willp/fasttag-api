@@ -1,30 +1,28 @@
 import time
 import hashlib
+import uuid
 import random
 import requests
 from urllib.parse import urlencode
 from typing import Dict, Any, List
 from models import TagData, ApiResponse
+import settings
 
 
-API_URL_MT01 = 'https://server.findtag.top/fit/openapi/devicedata/v1'
-API_URL_MT02 = 'http://www.brgps.com/open'
 
 class FindtagClientMT01:
-    def __init__(self, api_key: str, api_secret: str):
-        if not api_key or not api_secret:
-            raise Exception('API key and secret are required.')
+    def __init__(self, api_key: str, api_secret: str, base_url: str):
         self.api_key = api_key
         self.api_secret = api_secret
+        self.base_url = base_url
 
     def _generate_signature(self, params: dict) -> str:
         sorted_keys = sorted(params.keys())
-        key_value_string = '&'.join(f"{key}={params[key]}" for key in sorted_keys)
+        key_value_string = "&".join([f"{k}={params[k]}" for k in sorted_keys])
         string_to_sign = f"apikey={self.api_key}&apisecret={self.api_secret}&{key_value_string}"
-        md5_hash = hashlib.md5(string_to_sign.encode('utf-8')).hexdigest()
-        return md5_hash.upper()
+        return hashlib.md5(string_to_sign.encode()).hexdigest().upper()
 
-    def get_device_data(self, public_key: str, time_period: str = '0') -> 'TagData':
+    def get_device_data(self, public_key: str, time_period: str = '0'):
         timestamp = str(int(time.time()))
         nonce = ''.join(random.choices('abcdefghijklmnopqrstuvwxyz0123456789', k=8))
 
@@ -37,95 +35,99 @@ class FindtagClientMT01:
 
         sign = self._generate_signature(request_params)
 
-        full_params = request_params.copy()
-        full_params['apikey'] = self.api_key
-        full_params['sign'] = sign
-
-        url = f"{API_URL_MT01}?{urlencode(full_params)}"
+        full_params = {**request_params, 'apikey': self.api_key, 'sign': sign}
+        url = f"{self.base_url}?{urlencode(full_params)}"
 
         try:
-            response = requests.get(url)
+            response = requests.get(url, timeout=10)
             response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Error fetching data from Findtag API: {e}") from e
+            response_body = response.json()
 
-        try:
-            response_data = response.json()
-            response_body = ApiResponse(**response_data)
-        except Exception:
-            raise Exception(f"Error parsing response from Findtag API: {response.text}")
+            if response_body.get('code') != 0:
+                raise Exception(f"Error processing MT01 data: {response_body.get('msg')}")
 
-        if response_body.code != 0:
-            raise Exception(f"Error fetching data from Findtag API: {response_body.code}")
-
-        if response_body.data:
-            tag_data = response_body.data[0]
-
-            longitude_str, latitude_str = tag_data.coordinate.split(',')
-
-            tag_data.latitude = float(latitude_str)
-            tag_data.longitude = float(longitude_str)
-
-            return tag_data
-
-        raise Exception("No data found.")
-
+            if response_body.get('data'):
+                tag_data = response_body['data'][0]
+                lon, lat = tag_data['coordinate'].split(',')
+                tag_data['latitude'] = float(lat)
+                tag_data['longitude'] = float(lon)
+                return tag_data
+        except Exception as e:
+            raise Exception(f"Error processing MT01 data: {e}")
 
 class FindtagClientMT02:
-    def __init__(self, api_token: str):
-        if not api_token:
-            raise ValueError('API key required.')
+    def __init__(self, api_token: str, base_url: str):
         self.api_token = api_token
+        self.base_url = base_url
 
     def _get_headers(self) -> Dict[str, str]:
         return {
             'api_token': self.api_token,
             'timestamp': str(int(time.time())),
-            'Content-Type': 'application/json'
+            'accept': 'application/json'
         }
 
-    def get_device_data(self, public_key: str) -> TagData:
-        endpoint = f"{API_URL_MT02}/tag"
-        params = {'ids': public_key}
+    def fetch_all_devices(self) -> List[Dict[str, Any]]:
+        url = f"{self.base_url}/tag/all"
+        params = {"isActived": True}
+        all_devices = []
+        current_page = 1
 
         try:
-            response = requests.get(endpoint, headers=self._get_headers(), params=params, timeout=10)
-            response.raise_for_status()
-            data = response.json()
-            target_data = None
+            while True:
+                params["page"] = current_page
+                response = requests.get(url, params=params, headers=self._get_headers(), timeout=15)
+                response.raise_for_status()
+                page_data = response.json()
+                devices = page_data.get("data", [])
+                if not devices:
+                    break
 
-            if isinstance(data, list) and len(data) > 0:
-                target_data = data[0]
-            elif isinstance(data, dict):
-                if 'data' in data and isinstance(data['data'], list) and len(data['data']) > 0:
-                    target_data = data['data'][0]
-                elif 'all' in data:
-                    target_data = data
+                all_devices.extend(devices)
+                current_page += 1
 
-            if target_data:
-                return self._parse_tag_dto(target_data)
-
-            raise Exception(f"Tag not found or empty response: {data}")
-
-        except requests.exceptions.RequestException as e:
-            raise Exception(f"Error processing MT02 data: {e}")
+            return all_devices
         except Exception as e:
-            raise Exception(f": {e}")
+            print(f"Error fetching all devices: {e}")
+            return []
+
+    def get_device_data(self, public_key: str) -> TagData:
+        endpoint = f"{self.base_url}/tag"
+        params = {'ids': public_key}
+        #endpoint = f"{self.base_url.rstrip('/')}/tag"
+        #params = {'ids': public_key.strip()}
+
+        response = requests.get(endpoint, headers=self._get_headers(), params=params, timeout=10)
+
+        if response.status_code == 400:
+            raise Exception("Invalid public key")
+
+        response.raise_for_status()
+        data = response.json()
+
+        target_data = None
+        if isinstance(data, list) and len(data) > 0:
+            target_data = data[0]
+        elif isinstance(data, dict):
+            if 'data' in data and isinstance(data['data'], list) and len(data['data']) > 0:
+                target_data = data['data'][0]
+            elif 'all' in data:
+                target_data = data
+
+        if target_data:
+            return self._parse_tag_dto(target_data)
+
+        raise Exception(f"Tag not found: {public_key}")
 
     def _parse_tag_dto(self, dto: Dict[str, Any]) -> TagData:
-        try:
-            latitude = float(dto.get('lat', 0))
-            longitude = float(dto.get('lng', 0))
-
-            return TagData(
-                batteryLevel=dto.get('battery'),
-                collectionTime=dto.get('timestamp'),
-                coordinate=f"{longitude},{latitude}",
-                latitude=latitude,
-                longitude=longitude,
-                status="active" if dto.get('isActived') else "inactive"
-            )
-        except (ValueError, TypeError) as e:
-            raise Exception(f"Error converting Tag data format: {e}")
+        lat, lng = float(dto.get('lat', 0)), float(dto.get('lng', 0))
+        return TagData(
+            batteryLevel=dto.get('battery'),
+            collectionTime=dto.get('timestamp', int(time.time())),
+            coordinate=f"{lng},{lat}",
+            latitude=lat,
+            longitude=lng,
+            status="active" if dto.get('isActived') else "inactive"
+        )
 
 

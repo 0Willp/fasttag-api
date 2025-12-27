@@ -4,9 +4,12 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-fastapi = "*"
 pydantic = "*"
+fastapi = "*"
+uvicorn = "*"
 requests = "*"
+pydantic-settings = "*"
+python-multipart = "*"
 
 [dev-packages]
 uvicorn = "*"
