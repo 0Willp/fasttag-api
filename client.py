@@ -57,18 +57,18 @@ class FindtagClientMT01:
 
 class FindtagClientMT02:
     def __init__(self, api_token: str, base_url: str):
-        self.api_token = api_token
-        self.base_url = base_url
+        self.api_token = api_token.strip()
+        self.base_url = base_url.strip().rstrip('/')
 
     def _get_headers(self) -> Dict[str, str]:
         return {
             'api_token': self.api_token,
             'timestamp': str(int(time.time())),
-            'accept': 'application/json'
+            'Content-Type': 'application/json'
         }
 
     def fetch_all_devices(self) -> List[Dict[str, Any]]:
-        url = f"{self.base_url}/tag/all"
+        endpoint = f"{self.base_url}/tag/all"
         params = {"isActived": True}
         all_devices = []
         current_page = 1
@@ -76,7 +76,7 @@ class FindtagClientMT02:
         try:
             while True:
                 params["page"] = current_page
-                response = requests.get(url, params=params, headers=self._get_headers(), timeout=15)
+                response = requests.get(endpoint, params=params, headers=self._get_headers(), timeout=15)
                 response.raise_for_status()
                 page_data = response.json()
                 devices = page_data.get("data", [])
@@ -89,35 +89,25 @@ class FindtagClientMT02:
             return all_devices
         except Exception as e:
             print(f"Error fetching all devices: {e}")
-            return []
+            return all_devices
 
     def get_device_data(self, public_key: str) -> TagData:
         endpoint = f"{self.base_url}/tag"
-        params = {'ids': public_key}
-        #endpoint = f"{self.base_url.rstrip('/')}/tag"
-        #params = {'ids': public_key.strip()}
+        params = {'ids': public_key.strip()}
 
         response = requests.get(endpoint, headers=self._get_headers(), params=params, timeout=10)
 
         if response.status_code == 400:
-            raise Exception("Invalid public key")
+            raise Exception("Error fetching tag data, check your API token and url API.")
 
         response.raise_for_status()
         data = response.json()
 
-        target_data = None
-        if isinstance(data, list) and len(data) > 0:
-            target_data = data[0]
-        elif isinstance(data, dict):
-            if 'data' in data and isinstance(data['data'], list) and len(data['data']) > 0:
-                target_data = data['data'][0]
-            elif 'all' in data:
-                target_data = data
+        target_data = data[0] if isinstance(data, list) and data else data.get('data', [None])[0]
+        if not target_data:
+            raise Exception(f"Tag not found: {public_key}")
 
-        if target_data:
-            return self._parse_tag_dto(target_data)
-
-        raise Exception(f"Tag not found: {public_key}")
+        return self._parse_tag_dto(target_data)
 
     def _parse_tag_dto(self, dto: Dict[str, Any]) -> TagData:
         lat, lng = float(dto.get('lat', 0)), float(dto.get('lng', 0))
