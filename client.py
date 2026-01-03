@@ -55,7 +55,7 @@ class FindtagClientMT01:
         except Exception as e:
             raise Exception(f"Error processing MT01 data: {e}")
 
-class FindtagClientMT02:
+class FindtagClientBrGPS:
     def __init__(self, api_token: str, base_url: str):
         self.api_token = api_token.strip()
         self.base_url = base_url.strip().rstrip('/')
@@ -121,3 +121,71 @@ class FindtagClientMT02:
         )
 
 
+class FindtagClientWebTag:
+    def __init__(self, username:str, password:str, base_url:str):
+        self.username = username
+        self.password = password
+        self.base_url = base_url
+        self.base_url = base_url.strip().rstrip('/')
+        self.token = None
+        self.developer_id = None
+
+    def login(self):
+        url = "https://liketop.webtag.com.br/api/interface/login"
+        payload = {"username": self.username, "password": self.password}
+        response = requests.post(url, data=payload)
+        data = response.json()
+        if data.get('code') == "00000":
+            self.developer_id = data.get("id")
+            self.token = data.get("token")
+            return
+        raise Exception(f"Erro login WebTag: {data.get('msg')}")
+
+    def get_device_data(self, public_key: str) -> TagData:
+        # Request path: /interface/v3/device/:uid
+        endpoint = f"{self.base_url}/interface/v3/device/{self.developer_id}"
+        headers = {
+            "token": self.token,
+            "la": "en",
+            "Content-Type": "application/json"
+        }
+
+        payload = {"sn": str(public_key)}
+
+        try:
+            response = requests.post(endpoint, json=payload, headers=headers, timeout=10)
+            response.raise_for_status()
+            response_data = response.json()
+
+            if response_data.get("code") == "200" or response_data.get("msg") == "sucess":
+                data_obj = response_data.get("data", {})
+                trajectory_list = data_obj.get("trajectory", [])
+
+                if trajectory_list:
+                    latest_point = max(trajectory_list, key=lambda x: x.get('timestamp', 0))
+
+                    return self._parse_webtag_v3(latest_point)
+
+                raise Exception(f"No trajectory found for the equipment.: {public_key}")
+
+            raise Exception(f"Erro WebTag ({response_data.get('code')}): {response_data.get('msg')}")
+
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Error retrieving data from WebTag: {e}")
+
+
+    def _parse_webtag_v3(self, item: dict) -> TagData:
+        battery_level = int(item.get("status", 0))
+        if battery_level <= 32:battery = 100  # Full
+        elif battery_level <= 96:battery = 60  # Medium
+        elif battery_level <= 160:battery = 20  # Low
+        else:battery = 10  # Critical
+
+        return TagData(
+            batteryLevel=battery,
+            collectionTime=int(item.get("timestamp", time.time() * 1000) / 1000),
+            coordinate=f"{item['longitude']},{item['latitude']}",
+            latitude=float(item['latitude']),
+            longitude=float(item['longitude']),
+            status="active"
+        )

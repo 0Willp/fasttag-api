@@ -7,8 +7,12 @@ class Settings(BaseSettings):
     MT01_API_SECRET: str
     MT01_API_BASE_URL: str
 
-    MT02_API_TOKEN: str
-    MT02_API_BASE_URL: str
+    BRGPS_API_TOKEN: str
+    BRGPS_API_BASE_URL: str
+
+    WEBTAG_USERNAME: str
+    WEBTAG_PASSWORD: str
+    WEBTAG_BASE_URL: str
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -21,8 +25,13 @@ class Settings(BaseSettings):
                 "base_url": self.MT01_API_BASE_URL
             },
             "mt02": {
-                "token": self.MT02_API_TOKEN,
-                "base_url": self.MT02_API_BASE_URL
+                "token": self.BRGPS_API_TOKEN,
+                "base_url": self.BRGPS_API_BASE_URL
+            },
+            "webtag":{
+                "username": self.WEBTAG_USERNAME,
+                "password": self.WEBTAG_PASSWORD,
+                "base_url": self.WEBTAG_BASE_URL
             }
         }
 
