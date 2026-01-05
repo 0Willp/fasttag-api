@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     WEBTAG_USERNAME: str
     WEBTAG_PASSWORD: str
     WEBTAG_BASE_URL: str
+    WEBTAG_DEVELOPER_ID: int
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
             "webtag":{
                 "username": self.WEBTAG_USERNAME,
                 "password": self.WEBTAG_PASSWORD,
+                "developer_id": self.WEBTAG_DEVELOPER_ID,
                 "base_url": self.WEBTAG_BASE_URL
             }
         }

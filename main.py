@@ -27,11 +27,10 @@ try:
     )
 
     findtag_client_webtag = FindtagClientWebTag(
-        username=settings.WEBTAG_USERNAME,
-        password=settings.WEBTAG_PASSWORD,
+        developer_id=settings.WEBTAG_DEVELOPER_ID,
         base_url=settings.WEBTAG_BASE_URL
     )
-    findtag_client_webtag.login()
+
 except Exception as e:
     print(f"Erro ao inicializar: {e}")
 
@@ -71,8 +70,8 @@ async def get_all_brgps():
 # --- WebTag ---
 @app.get("/tag/position/webtag/{public_key}", response_model=TagPositionResponse, tags=["WebTag"], summary="Get Tag Position for WebTag")
 async def get_tag_position_webtag(public_key: str):
-    if not findtag_client_webtag.token:
-        findtag_client_webtag.login()
+    if not findtag_client_webtag:
+        raise HTTPException(status_code=503, detail="Findtag API WebTag client is not initialized.")
 
     try:
         data = findtag_client_webtag.get_device_data(public_key)

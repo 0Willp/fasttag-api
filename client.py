@@ -122,33 +122,28 @@ class FindtagClientBrGPS:
 
 
 class FindtagClientWebTag:
-    def __init__(self, username:str, password:str, base_url:str):
-        self.username = username
-        self.password = password
-        self.base_url = base_url
+    def __init__(self, developer_id: int, base_url:str):
+        self.developer_id = developer_id
         self.base_url = base_url.strip().rstrip('/')
-        self.token = None
-        self.developer_id = None
 
+    """
     def login(self):
         url = "https://liketop.webtag.com.br/api/interface/login"
+        headers = headers = {"language": "en","Content-Type": "application/json"}
         payload = {"username": self.username, "password": self.password}
-        response = requests.post(url, data=payload)
+        response = requests.post(url, json=payload, headers=headers, timeout=10)
         data = response.json()
         if data.get('code') == "00000":
             self.developer_id = data.get("id")
             self.token = data.get("token")
             return
         raise Exception(f"Erro login WebTag: {data.get('msg')}")
+    """
 
     def get_device_data(self, public_key: str) -> TagData:
         # Request path: /interface/v3/device/:uid
         endpoint = f"{self.base_url}/interface/v3/device/{self.developer_id}"
-        headers = {
-            "token": self.token,
-            "la": "en",
-            "Content-Type": "application/json"
-        }
+        headers = {"la": "pt","Content-Type": "application/json"}
 
         payload = {"sn": str(public_key)}
 
@@ -162,9 +157,9 @@ class FindtagClientWebTag:
                 trajectory_list = data_obj.get("trajectory", [])
 
                 if trajectory_list:
-                    latest_point = max(trajectory_list, key=lambda x: x.get('timestamp', 0))
+                    latest_trajectory = trajectory_list[-1]
 
-                    return self._parse_webtag_v3(latest_point)
+                    return self._parse_webtag_v3(latest_trajectory)
 
                 raise Exception(f"No trajectory found for the equipment.: {public_key}")
 
