@@ -1,5 +1,5 @@
 from fastapi import FastAPI, HTTPException
-from client import FindtagClientMT01, FindtagClientBrGPS, FindtagClientWebTag
+from client import FindtagClientMT01, FindtagClientBrGPS, FindtagClientWebTag, FindtagClientNanoTag
 from models import TagPositionResponse, TagData
 from typing import List
 from settings import settings
@@ -13,6 +13,7 @@ app = FastAPI(
 findtag_client_mt01 = None
 findtag_client_brgps = None
 findtag_client_webtag = None
+findtag_client_nanotag = None
 
 try:
     findtag_client_mt01 = FindtagClientMT01(
@@ -31,8 +32,13 @@ try:
         base_url=settings.WEBTAG_BASE_URL
     )
 
+    findtag_client_nanotag = FindtagClientNanoTag(
+        api_token=settings.NANOTAG_API_TOKEN,
+        base_url=settings.NANOTAG_BASE_URL
+    )
+
 except Exception as e:
-    print(f"Erro ao inicializar: {e}")
+    print(f"Error when initializing: {e}")
 
 def google_maps_link(lat: float, lon: float) -> str:
     return f"https://www.google.com/maps?q={lat},{lon}"
@@ -75,6 +81,18 @@ async def get_tag_position_webtag(public_key: str):
 
     try:
         data = findtag_client_webtag.get_device_data(public_key)
+        return TagPositionResponse(**data.model_dump(),google_maps_link=google_maps_link(data.latitude, data.longitude))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# --- NanoTag ---
+@app.get("/tag/position/nanotag/{public_key}", response_model=TagPositionResponse, tags=["NanoTag"], summary="Get Tag Position for NanoTag")
+async def get_tag_position_nanotag(public_key: str):
+    if not findtag_client_nanotag:
+        raise HTTPException(status_code=503, detail="Findtag API NanoTag client is not initialized.")
+
+    try:
+        data = findtag_client_nanotag.get_device_data(public_key)
         return TagPositionResponse(**data.model_dump(),google_maps_link=google_maps_link(data.latitude, data.longitude))
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

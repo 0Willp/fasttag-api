@@ -5,9 +5,9 @@ name = "pypi"
 
 [packages]
 python-multipart = "*"
+requests = "*"
 fastapi = "*"
 uvicorn = "*"
-requests = "*"
 pydantic = "*"
 pydantic-settings = "*"
 

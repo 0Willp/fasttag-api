@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     WEBTAG_BASE_URL: str
     WEBTAG_DEVELOPER_ID: int
 
+    NANOTAG_API_TOKEN: str
+    NANOTAG_BASE_URL: str
+
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property
@@ -34,7 +37,12 @@ class Settings(BaseSettings):
                 "password": self.WEBTAG_PASSWORD,
                 "developer_id": self.WEBTAG_DEVELOPER_ID,
                 "base_url": self.WEBTAG_BASE_URL
+            },
+            "nanotag":{
+                "token": self.NANOTAG_API_TOKEN,
+                "base_url": self.NANOTAG_BASE_URL
             }
+
         }
 
 settings = Settings()

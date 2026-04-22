@@ -5,6 +5,7 @@ import random
 import requests
 from urllib.parse import urlencode
 from typing import Dict, Any, List
+from datetime import datetime
 from models import TagData, ApiResponse
 import settings
 
@@ -182,5 +183,54 @@ class FindtagClientWebTag:
             coordinate=f"{item['longitude']},{item['latitude']}",
             latitude=float(item['latitude']),
             longitude=float(item['longitude']),
+            status="active"
+        )
+
+
+class FindtagClientNanoTag:
+    def __init__(self, api_token: str, base_url:str):
+        self.api_token = api_token.strip()
+        self.base_url = base_url.strip()
+
+    def get_device_data(self, public_key: str) -> TagData:
+        payload = {
+            "token": self.api_token,
+            "requisicao": "last_position"
+        }
+
+        response = requests.post(self.base_url, json=payload, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+
+        if not data.get("success"):
+            raise Exception(f"Error fetching tag data, check your API token and url API.")
+
+        devices = data.get("data", [])
+        target_device = next((d for d in devices if d.get("id") == public_key), None)
+
+        if not target_device:
+            raise Exception(f"Tag not found: {public_key}")
+
+        return self._parse_tag_dto(target_device)
+
+    def _parse_tag_dto(self, dto: Dict[str, Any]) -> TagData:
+        lat = float(dto.get('lat', 0))
+        lng = float(dto.get('lng', 0))
+
+        data_string = dto.get('datahora', "")
+        timestamp = int(time.time())
+        if data_string:
+            try:
+                dt_obj = datetime.strptime(data_string, "%d/%m/%Y %H:%M:%S")
+                timestamp = int(dt_obj.timestamp())
+            except ValueError:
+                pass
+
+        return TagData(
+            batteryLevel=int(dto.get('bat', 0)),
+            collectionTime=timestamp,
+            coordinate=f"{lng},{lat}",
+            latitude=lat,
+            longitude=lng,
             status="active"
         )
